@@ -16,7 +16,7 @@ suffer from long (scene-specific) training times.
 Our work draws from recent progress in neural spatio-temporal
 supersampling to enhance a state-of-the-art neural renderer's ability
 to infer novel-view information at inference time.
-We adapt a supersampling architecture~\cite{xiao2020neural}, which
+We adapt a supersampling architecture [Xiao et al. 2020], which
 resamples previously rendered frames, to instead recombine nearby camera images in a multi-view dataset.
 These input frames are warped into a joint target frame, guided by
 the most recent (point-based) scene representation, followed by neural
