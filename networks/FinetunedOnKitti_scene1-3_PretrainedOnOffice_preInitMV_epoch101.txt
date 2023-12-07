@@ -1,0 +1,5 @@
+name: FinetunedOnKitti_scene1-3_PretrainedOnOffice_preInitMV_epoch101
+feature_extraction_depth: 0
+movec_channels: 3
+groundtruth_amount: 4
+prevInitMV: 1

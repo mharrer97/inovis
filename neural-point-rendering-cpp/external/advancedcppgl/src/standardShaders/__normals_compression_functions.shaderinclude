@@ -1,0 +1,72 @@
+
+//NORMALS 16/16
+
+//normal coding
+//from: https://aras-p.info/texts/CompactNormalStorage.html
+vec2 encodeNormal(vec3 n)
+{
+	float p = sqrt(n.z * 8 + 8);
+	return vec2(n.xy / p + 0.5);
+}
+
+vec3 decodeNormal(vec2 enc)
+{
+	vec2 fenc = enc * 4 - 2;
+	float  f = dot(fenc, fenc);
+	float  g = sqrt(1 - f / 4);
+	vec3 n;
+	n.xy = fenc*g;
+	n.z = 1.0 - f / 2.0;
+	return n;
+}
+
+float pack2Half(vec2 toPack) {
+	return uintBitsToFloat(packHalf2x16(toPack));
+}
+
+vec2 unpack2Half(float packedFloat) {
+	return unpackHalf2x16(floatBitsToUint(packedFloat));
+}
+
+
+//NORMALS 11/11/10
+
+//source: https://aras-p.info/texts/CompactNormalStorage.html#method03spherical
+//other needs to be max 10 bit
+float superLowResNormalEncoding(vec3 normal, uint other) {
+	const uint bits = 11;
+	const uint max_in_int = (1 << bits) - 1;
+	const float max = float(max_in_int);
+	const uint mask = (1 << bits) - 1;
+
+	//with floating points, a bit of precision loss is better than a flat 0.0
+	normal = normal * .48 +.48;
+
+	float x_n = normal.x*max;
+	float y_n = normal.y*max;
+	uvec2 n_in_int = uvec2(x_n, y_n);
+	n_in_int.x &= mask;
+	n_in_int.y &= mask;
+	uint result = (other << (bits * 2) | n_in_int.x << bits | n_in_int.y);
+
+
+	return uintBitsToFloat(result);
+}
+vec3 superLowResNormalDecoding(float value) {
+	const uint bits = 11;
+	const uint max_in_int = (1 << bits) - 1;
+	const float max = float(max_in_int);
+	const uint mask = (1 << bits) - 1;
+
+	uint val = floatBitsToUint(value);
+	uvec2 normal_in_int = uvec2((val >> 11) & mask, val & mask);
+	vec2 normal_encoded = vec2(normal_in_int) / max;
+	normal_encoded = normal_encoded * 2 - 1;
+	
+	float z_n = sqrt(1 - dot(normal_encoded.xy, normal_encoded.xy));
+	vec3 normal = vec3(normal_encoded.xy, z_n);
+	if (length(normal) > 2)
+		normal = vec3(0, 0, 1);
+	return normalize(normal);
+}
+

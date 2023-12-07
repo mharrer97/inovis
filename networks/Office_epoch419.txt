@@ -1,0 +1,5 @@
+name: Office_epoch419
+feature_extraction_depth: 0
+movec_channels: 3
+groundtruth_amount: 4
+prevInitMV: 0

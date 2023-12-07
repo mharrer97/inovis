@@ -1,0 +1,121 @@
+//include file for all tonemapping and inverse tonemapping functionsfunctions
+
+
+
+///////////////////////////////////////////////////////////////////
+//hlsl compatiblilty
+float rcp(float val) {
+	return 1.0 / val;
+}
+
+///////////////////////////////////////////////////////////////////
+//GAMMA CORRECTION FUNCTIONS
+const float corrector = (1.f / 2.4f);
+// PBRT gamma correct
+float gammaCorrect(float value) {
+	if (value <= 0.0031308f)
+		return 12.92f * value;
+	return 1.055f * pow(value, corrector) - 0.055f;
+}
+
+vec3 gammaCorrect3(vec3 col) {
+	return vec3(gammaCorrect(col.x), gammaCorrect(col.y),
+		gammaCorrect(col.z));
+}
+
+float gammaCorrect_inverse(float val) {
+	if (val <= 0.04045)
+		return val / 12.92f;
+
+	return pow((val + 0.055) / 1.055, 2.4);
+
+}
+vec3 gammaCorrect3_inverse(vec3 col) {
+	return vec3(gammaCorrect_inverse(col.x), gammaCorrect_inverse(col.y),
+		gammaCorrect_inverse(col.z));
+}
+
+
+
+///////////////////////////////////////////////////////////////////
+//TONEMAPPING FUNCTIONS
+
+vec3 whitePreservingLumaBasedReinhardToneMapping(vec3 color, const float gamma, const float luminence)
+{
+	float white = luminence;
+	float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
+	float toneMappedLuma = luma * (1. + luma / (white*white)) / (1. + luma);
+	color *= toneMappedLuma / luma;
+	color = pow(color, vec3(1. / gamma));
+	return color;
+}
+
+//I think from the unreal engine
+vec3 ACESFilm(vec3 x)
+{
+	const float a = 2.51f;
+	const float b = 0.03f;
+	const float c = 2.43f;
+	const float d = 0.59f;
+	const float e = 0.14f;
+	return clamp(((x*(a*x + b)) / (x*(c*x + d) + e)), 0.0, 1.0);
+}
+
+
+float ACESFilm_inverse_one_comp(float x) {
+	return (-0.59*x+0.03+sqrt(-1.0127*x*x+1.3702*x+0.0009)) / (2*(2.43*x-2.51));
+}
+
+vec3 ACESFilm_inverse(vec3 col) {
+	return vec3(ACESFilm_inverse_one_comp(col.x), ACESFilm_inverse_one_comp(col.y), ACESFilm_inverse_one_comp(col.z));
+}
+
+float karisLuma(vec3 c) {
+	return max(c.x, max(c.y, c.z));
+	//return dot(c, vec3(0.299, 0.587, 0.114));
+	//return dot(c, vec3(0.2126, 0.7152, 0.0722));
+}
+
+vec3 karisMapping(vec3 c) {
+	return (c * rcp(1 + karisLuma(c)));
+}
+
+vec3 karisMappingInverse(vec3 c) {
+	return (c * rcp(1 - karisLuma(c)) );
+}
+
+float karisWeight(vec3 c) {
+	return rcp(1 + karisLuma(c));
+}
+
+float karisRecoverWeightN(vec3 c, float n) {
+	return n - karisLuma(c);
+}
+
+
+vec3 uncharted2ToneMappingCompact(vec3 c) {
+	return c * (c*1.28713 + 0.153229) / (c*(c + 3.33333) + 0.4);
+}
+
+
+vec3 filmic_tonemap_uncharted2(vec3 x) {
+	const float A = .22;
+	const float B = .3;
+	const float C = .1;
+	const float D = .2;
+	const float E = .01;
+	const float F = .3;
+	return ((x*(A*x + C*B) + D*E) / (x*(A*x + B) + D*F)) - E / F;
+}
+
+vec3 filmic_tonemap_uncharted2_inverse(vec3 x)
+{
+	const float A = .22;
+	const float B = .3;
+	const float C = .1;
+	const float D = .2;
+	const float E = .01;
+	const float F = .3;
+	return (sqrt((4 * x - 4 * x*x)*A*D*F*F*F + (-4 * x*A*D*E + B*B*C*C - 2 * x*B*B*C + x*x*B*B)*F*F + (2 * x*B*B - 2 * B*B*C)*E*F + B*B*E*E) + (B*C - x*B)*F - B*E) / ((2 * x - 2)*A*F + 2 * A*E);
+}
+

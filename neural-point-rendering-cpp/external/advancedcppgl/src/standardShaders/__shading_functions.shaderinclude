@@ -1,0 +1,94 @@
+//simple include file for shading functions
+
+
+// ambient lighting
+vec3 ambientFunc(vec3 materialDiffuse, float dotNL) {
+	return  0.05 * dotNL * materialDiffuse + 0.12 * materialDiffuse;
+}
+vec3 ambientFunc(vec3 materialDiffuse, float dotNL, float kAmb) {
+	return  0.05 * dotNL * materialDiffuse + kAmb * materialDiffuse;
+}
+vec3 ambientFunc(vec3 materialDiffuse, float dotNL, float kAmb, float kDiff) {
+	return  kDiff * dotNL * materialDiffuse + kAmb * materialDiffuse;
+}
+//\ambient lighting
+
+
+
+//diffuse lighting
+vec3 diffuseFunc(float dotNL, vec3 materialDiffuse) {
+	return  dotNL * materialDiffuse;
+}
+vec3 diffuseFunc(float dotNL, vec3 materialDiffuse, float shadowFactor) {
+	return shadowFactor * dotNL * materialDiffuse;
+}
+//\diffuse lighting
+
+
+
+//Specular GGX
+//from http://filmicworlds.com/blog/optimizing-ggx-shaders-with-dotlh/
+
+const float F0_fixed = 1.7; //not parsed from obj
+vec2 LightingFuncGGX_FV(float dotLH, float roughness)
+{
+	float alpha = roughness*roughness;
+
+	// F
+	float F_a, F_b;
+	float dotLH5 = pow(1.0f - dotLH, 5);
+	F_a = 1.0f;
+	F_b = dotLH5;
+
+	// V
+	float vis;
+	float k = alpha / 2.0f;
+	float k2 = k*k;
+	float invK2 = 1.0f - k2;
+	vis = 1.0/(dotLH*dotLH*invK2 + k2);
+
+	return vec2(F_a*vis, F_b*vis);
+}
+
+float LightingFuncGGX_D(float dotNH, float roughness)
+{
+	float alpha = roughness*roughness;
+	float alphaSqr = alpha*alpha;
+	const float pi = 3.14159f;
+	float denom = dotNH * dotNH *(alphaSqr - 1.0) + 1.0f;
+
+	float D = alphaSqr / (pi * denom * denom);
+	return D;
+}
+
+
+//F0: ior/n2 (metallicness)?
+float LightingFuncGGX_OPT3(float dotNL, float dotLH, float dotNH, float roughness)
+{
+	float D = LightingFuncGGX_D(dotNH, roughness);
+	vec2 FV_helper = LightingFuncGGX_FV(dotLH, roughness);
+	float FV = F0_fixed*FV_helper.x + (1.0f - F0_fixed)*FV_helper.y;
+	float specular = dotNL * D * FV;
+
+	return specular;
+}
+
+float LightingFuncGGX_OPT3(float dotNL, float dotLH, float dotNH, float roughness, float F0)
+{
+	float D = LightingFuncGGX_D(dotNH, roughness);
+	vec2 FV_helper = LightingFuncGGX_FV(dotLH, roughness);
+	float FV = F0*FV_helper.x + (1.0f - F0)*FV_helper.y;
+	float specular = dotNL * D * FV;
+
+	return specular;
+}
+
+float specularFunc(float dotNL, float dotLH, float dotNH, float roughness) {
+	return LightingFuncGGX_OPT3(dotNL, dotLH, dotNH, roughness, F0_fixed);
+}
+float specularFunc(float dotNL, float dotLH, float dotNH, float roughness, float F0) {
+	return LightingFuncGGX_OPT3(dotNL, dotLH, dotNH, roughness, F0);
+}
+
+//\Specular GGX
+

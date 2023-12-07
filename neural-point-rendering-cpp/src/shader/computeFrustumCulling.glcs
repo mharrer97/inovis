@@ -1,0 +1,146 @@
+//Compute Shader Example
+// this shader takes one input texture bound to location 0 and outputs it in greyscale to an image bound to binding 0,
+// using one shader invocation with one thread for each pixel
+#version 460
+
+struct PointCloudVoxel {
+    vec3 center; // center of the voxel
+	float radius; // radius, i.e. distance from center to a corner
+    vec3 aabb_min; // min of the axis aligned voxel
+	uint start; // start index of the voxel in the pointcloud
+    vec3 aabb_max; // max of the axis aligned voxel    
+    uint size; // count of points in the voxel
+};
+
+layout(std430, binding = 1) buffer voxelBuffer
+{
+	PointCloudVoxel voxel[];
+} ;
+
+
+struct DrawElementsIndirectCommandData {
+		uint count;
+		uint instanceCount;
+		uint first;
+		uint baseVertex;
+		uint baseInstance;
+};
+
+// we have 2 buffer: one for the original draw commands that contains the data to render all voxels
+layout ( std430 , binding = 2) buffer DrawElementsIndirectCommandBufferIn {
+DrawElementsIndirectCommandData commandIn [];
+};
+
+// one for storing the commands to 
+layout ( std430 , binding = 4) buffer DrawElementsIndirectCommandBufferOut {
+DrawElementsIndirectCommandData commandOut [];
+};
+
+uniform vec3 cam_pos;
+uniform vec3 cam_dir;
+uniform vec3 cam_up;
+uniform float cam_near;
+uniform float cam_far;
+uniform float cam_fov;
+uniform float cam_aspect;
+
+
+uniform int voxel_count;
+// use a usual opengl texture as input
+//layout(location = 0) uniform sampler2D input_texture;
+
+// use a opengl texture, bound as an image (writable texture) as output
+// important: a format identifier is necessary for images
+// important: "binding" slots are different to "location" slots, thus input and output are not bound to the same texture!!!
+//layout(binding = 0, rgba32f) uniform image2D output_image;
+
+
+// this layout qualifier establishes the size of the threadgroups in one block (in this case 32x32 = 1024 threads)
+// using the cppgl framework, this layout is handled implicitly. (But this line must be present anyway)
+layout(local_size_x = 32, local_size_y = 32) in;
+
+#include "cullingHelper.glsl"
+
+void main(void){
+
+	// this gives the global identification of each thread (here: called "gid" in short)
+	// the example shader is launched with one thread for each pixel of the context resolution, 
+	// thus "gid" can be used to access the pixel which the thread should work on
+	// ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+	// for the culling, there is a thread for each voxel, in the x id
+	uint gid = gl_GlobalInvocationID.x;
+	if(gid >= voxel_count) return;
+	else{
+		DrawElementsIndirectCommandData new_command = commandIn[gid];
+		PointCloudVoxel vox = voxel[gid];
+		vec3 cam_dir_normalized = normalize(cam_dir);
+
+		int inside = 1; // asume voxel inside until proven otherwise
+		// center of near and far planes
+		vec3 nc = cam_pos + cam_dir_normalized * cam_near;
+		vec3 fc = cam_pos + cam_dir_normalized * cam_far;
+		// near plane
+		float iSP_n = intersectSpherePlane(vox.center, nc, cam_dir_normalized);
+		inside = inside * int(iSP_n > -vox.radius);
+		// far plane
+		float iSP_f = intersectSpherePlane(vox.center, fc, -cam_dir_normalized);
+		inside = inside * int(iSP_f > -vox.radius);
+		
+		// compute width and height of the near and far plane sections
+		float tang = tan( radians(cam_fov) * 0.5f) ;
+		float nh = cam_near * tang;
+		float nw = nh * cam_aspect;
+		float fh = cam_far  * tang;
+		float fw = fh * cam_aspect;
+		// up direction is potentially not the y axis of the camera -> get real y axis
+		vec3 cam_right = normalize(cross(cam_dir, cam_up));
+		// the real "up" vector is the cross product of Z and X
+		vec3 cam_up_corrected = normalize(cross(cam_right, cam_dir));
+		
+		// compute the 4 corners of the frustum on the near plane
+		vec3 ntl = nc + cam_up_corrected * nh - cam_right * nw;
+		vec3 ntr = nc + cam_up_corrected * nh + cam_right * nw;
+		vec3 nbl = nc - cam_up_corrected * nh - cam_right * nw;
+		vec3 nbr = nc - cam_up_corrected * nh + cam_right * nw;
+
+		// compute the 4 corners of the frustum on the far plane
+		vec3 ftl = fc + cam_up_corrected * fh - cam_right * fw;
+		vec3 ftr = fc + cam_up_corrected * fh + cam_right * fw;
+		vec3 fbl = fc - cam_up_corrected * fh - cam_right * fw;
+		vec3 fbr = fc - cam_up_corrected * fh + cam_right * fw;
+
+		// right
+		// right normal is cross product of two vectors in the plane
+		vec3 norm_r = normalize(cross(ftr-ntr,nbr-ntr));
+		float iSP_r = intersectSpherePlane(vox.center, cam_pos, norm_r);
+		inside = inside * int(iSP_r > -vox.radius);
+		// left
+		vec3 norm_l = normalize(cross(nbl-ntl,ftl-ntl));
+		float iSP_l = intersectSpherePlane(vox.center, cam_pos, norm_l);
+		inside = inside * int(iSP_l > -vox.radius);
+		// top
+		vec3 norm_t = normalize(cross(ntl-ntr,ftr-ntr));
+		float iSP_t = intersectSpherePlane(vox.center, cam_pos, norm_t);
+		inside = inside * int(iSP_t > -vox.radius);
+		// bottom
+		vec3 norm_b = normalize(cross(nbr-nbl,fbl-nbl));
+		float iSP_b = intersectSpherePlane(vox.center, cam_pos, norm_b);
+		inside = inside * int(iSP_b > -vox.radius);
+		if(!bool(inside))
+			new_command.count = 0 ;
+		commandOut[gid] = new_command;
+
+	}
+	// https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/texelFetch.xhtml
+	// texelFetch is similar to a texture()-call, but with explicit pixel access coordinates ("gid" is in range [0,Context::resolution-1]) and mipmap-level (in this case 0)
+	//vec4 input_col = texelFetch(input_texture, gid, 0);
+
+	//convert input to greyscale
+	//vec4 out_col = vec4(vec3(length(input_col.rgb)),1.0);
+
+	//write the output color to pixel at position gid
+	//imageStore(output_image, gid, out_col);
+
+	return;
+}
+

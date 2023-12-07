@@ -1,0 +1,7 @@
+name: dataset_generic_bagger
+folder: ../../datasets/bagger2/
+type: Generic
+size: 48
+info: -
+width: 1280
+height: 720

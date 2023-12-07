@@ -1,0 +1,91 @@
+//Compute Shader Example
+// this shader takes one input texture bound to location 0 and outputs it in greyscale to an image bound to binding 0,
+// using one shader invocation with one thread for each pixel
+#version 460
+
+struct PointCloudVoxel {
+    vec3 center; // center of the voxel
+	float radius; // radius, i.e. distance from center to a corner
+    vec3 aabb_min; // min of the axis aligned voxel
+	uint start; // start index of the voxel in the pointcloud
+    vec3 aabb_max; // max of the axis aligned voxel    
+    uint size; // count of points in the voxel
+};
+
+layout(std430, binding = 1) buffer voxelBuffer
+{
+	PointCloudVoxel voxel[];
+} ;
+
+
+struct DrawElementsIndirectCommandData {
+		uint count;
+		uint instanceCount;
+		uint first;
+		uint baseVertex;
+		uint baseInstance;
+};
+
+// we have 2 buffer: one for the original draw commands that contains the data to render all voxels
+layout ( std430 , binding = 2) buffer DrawElementsIndirectCommandBufferIn {
+DrawElementsIndirectCommandData commandIn [];
+};
+
+// one for storing the commands to 
+layout ( std430 , binding = 4) buffer DrawElementsIndirectCommandBufferOut {
+DrawElementsIndirectCommandData commandOut [];
+};
+
+uniform vec3 cam_pos;
+uniform vec3 cam_dir;
+
+uniform int voxel_count;
+// use a usual opengl texture as input
+//layout(location = 0) uniform sampler2D input_texture;
+
+// use a opengl texture, bound as an image (writable texture) as output
+// important: a format identifier is necessary for images
+// important: "binding" slots are different to "location" slots, thus input and output are not bound to the same texture!!!
+//layout(binding = 0, rgba32f) uniform image2D output_image;
+
+
+// this layout qualifier establishes the size of the threadgroups in one block (in this case 32x32 = 1024 threads)
+// using the cppgl framework, this layout is handled implicitly. (But this line must be present anyway)
+layout(local_size_x = 32, local_size_y = 32) in;
+
+#include "cullingHelper.glsl"
+
+void main(void){
+
+	// this gives the global identification of each thread (here: called "gid" in short)
+	// the example shader is launched with one thread for each pixel of the context resolution, 
+	// thus "gid" can be used to access the pixel which the thread should work on
+	// ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+	// for the culling, there is a thread for each voxel, in the x id
+	uint gid = gl_GlobalInvocationID.x;
+	if(gid >= voxel_count) return;
+	else{
+		DrawElementsIndirectCommandData new_command = commandIn[gid];
+		PointCloudVoxel vox = voxel[gid];
+		/* vec3 voxel_dir = vox.center - cam_pos; 
+		float dottmp = dot(normalize(view_dir),normalize(voxel_dir));
+		if(dottmp < 0.0f)  */
+		float iSP = intersectSpherePlane(vox.center, cam_pos, cam_dir);//cam_pos, cam_dir)
+		if(iSP < -vox.radius)
+			new_command.count = 0 ;
+		commandOut[gid] = new_command;
+
+	}
+	// https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/texelFetch.xhtml
+	// texelFetch is similar to a texture()-call, but with explicit pixel access coordinates ("gid" is in range [0,Context::resolution-1]) and mipmap-level (in this case 0)
+	//vec4 input_col = texelFetch(input_texture, gid, 0);
+
+	//convert input to greyscale
+	//vec4 out_col = vec4(vec3(length(input_col.rgb)),1.0);
+
+	//write the output color to pixel at position gid
+	//imageStore(output_image, gid, out_col);
+
+	return;
+}
+
