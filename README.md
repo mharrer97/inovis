@@ -1,6 +1,7 @@
 # Inovis: Instant Novel-View Synthesis
 [Mathias Harrer](https://reality.tf.fau.de/staff/m.harrer.html)<sup>1</sup> , 
-[Linus Franke](https://lfranke.github.io/)<sup>1</sup> , [Laura Fink](https://www.lgdv.tf.fau.de/person/laura-fink/)<sup>1,2</sup> , [Marc Stamminger](https://www.lgdv.tf.fau.de/person/marc-stamminger/)<sup>1</sup> , [Tim Weyrich](https://reality.tf.fau.de/weyrich.html)<sup>1</sup> \
+[Linus Franke](https://lfranke.github.io/)<sup>1</sup> , [Laura Fink](https://lorafib.github.io
+)<sup>1,2</sup> , [Marc Stamminger](https://www.lgdv.tf.fau.de/person/marc-stamminger/)<sup>1</sup> , [Tim Weyrich](https://reality.tf.fau.de/weyrich.html)<sup>1</sup> \
 <sup>1</sup> Friedrich-Alexander-Universität Erlangen-Nürnberg, Germany\
 <sup>2</sup> Fraunhofer IIS, Erlangen, Germany\
 ![image](./img/teaser.jpg)
