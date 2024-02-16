@@ -105,8 +105,6 @@ When creating a training dataset, this impacts the dataset, as the warp vectors 
 
 To load a dataset, the dataset must be in the correct format and a dataset config file must be placed in the datasets folder, see [here](../datasets/).
 
-TODO new dataset type and therefore format.
-
 ## Training Dataset Export
 
 For training, the data must be converted to a image-based data format, see [here](../neural-point-rendering-training/data/).
